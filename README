@@ -2,17 +2,17 @@ A simple single-header-only c++ library for reading in various settings from tex
 
 The text file must specify key/value pairs separated by the '=' sign, e.g.:
 
-    key1 = a_value
+  key1 = a_value
 
 Values can be numbers, strings, arrays of numbers or arrays of strings:
 
-    stringKey = some_word
+  stringKey = some_word
 
-    numericKey = 1e-4
+  numericKey = 1e-4
 
-    arrayOfNumbers = [1,3,5e-3]
+  arrayOfNumbers = [1,3,5e-3]
 
-    arrayOfText = [first, second, third , 4] 
+  arrayOfText = [first, second, third , 4] 
 
 Comments can be insterted following the '#' character.
 
@@ -20,31 +20,30 @@ Comments can be insterted following the '#' character.
 Use:
 
 1. include the "reader.h" file.
-
+  #include <reader.h>
 2. Create a reader object: 
-	Reader reader;
+  Reader reader;
 
 3. Read a text file: 
-	reader.readSettings("test.txt");
+  reader.readSettings("test.txt");
 
 4. Read in values :
 
-    try {
-	string s = reader.getValueByKey<string>("stringKey");
-	std::vector<float> = reader.getValueByKey<std::vector<float>>("arrayOfNumbers"); 
+try {
+  string s = reader.getValueByKey<string>("stringKey");
+  std::vector<float> = reader.getValueByKey<std::vector<float>>("keyName"); 
 
-	if (reader.containsKey("OptionalKey) ){
-	    int optionalInt = reader.getValueByKey<int>("OptionalInt");
-	}
+  if (reader.containsKey("OptionalKey) ){
+    int optionalInt = reader.getValueByKey<int>("OptionalKey");
+  }
 
-    }catch(ReaderError e){
-	e.printError();
-    }
- 
+  }catch(ReaderError e){
+    e.printError();
+}
 
 Exceptions will be thrown when things don't work out. For example when trying to
 read incompaible types. The thrown exception contains in addition to a convenience
-print method:
-	1. Readon of exception.
-	2. name of input file..
-	3. line number in input file causing the exception.
+print method the following data:
+	1. Reason for exception.
+	2. Name of input file..
+	3. Line number in input file causing the exception.

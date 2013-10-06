@@ -48,7 +48,7 @@ class Reader
         std::string _rawText;   // raw unformatted text of the line
         std::string _val;       // formatted value stored as a string
     };
-
+    bool _isCaseSensitive;      // if not case sensitive, all text will be converted to lowercase
     // ERROR MESSAGES
     const std::string _R_FILE_OPEN_ERROR_MESSAGE = "Could not open file :";
     const std::string _R_VECTOR_FORMAT_ERROR_MSG="Bad vector format";
@@ -68,12 +68,13 @@ class Reader
 
     std::string _fileName; // holds current file name
     std::map<std::string, lineData> _keyValues; // "database" of all read key/value pairs
-
+    // STRING FORMATTING FUNCTIONS
     void removeComments(std::string &line) const;   // removes everything in a line after comment character
     void cleanLineEnds(std::string &line) const;    // removes white space from both ends of a string
     bool splitByChar(const std::string &line, std::string &key, std::string &value, const char& split='=') const;
-    void validateNumber(const std::string &strVal) const;   // throws ReaderError if input string cannot be parsed to a number
+    bool isValidNumber(const std::string &strVal) const;   // returns false if not a valid number
     size_t getLineNumberByKey(const std::string &key) const; // find line number in file where a given key is defined
+    void toLower(std::string &s) const; // converts string to all lower case
 
     // SPECIALISATIONS FOR HANDLING DIFFERENT VALUE TYPES
     void parseValue(const std::string &strVal, std::string &val) const;
@@ -92,47 +93,45 @@ class Reader
 
         // then convert each item to a number
         for (auto &s : svals){
-            validateNumber(s);
-            std::stringstream ss(s);
-            double tval(0);
-            if ( ss >> tval){
-                val.push_back( static_cast<T>(tval) );
-            }else
-            {
-                std::string errMSG = "Could not convert ";
-                errMSG += s += "to number";
+            if ( !isValidNumber(s) ){
+                std::string errMSG = _R_NUMBER_FORMAT_ERROR_MSG + s;
                 throw errMSG;
             }
-       }
+            std::stringstream ss(s);
+            double tval(0);
+            ss >> tval;
+            val.push_back( static_cast<T>(tval) );
+        }
     }
-
     template <class T >  void parseValue(const std::string &strVal, T &val) const{
     /*!
       Converts to numebers
       */
-        validateNumber(strVal);
-
-        std::string sval;
-        parseValue(strVal, sval);
-
-        // first convert to double, then to other if needed
-        std::stringstream ss(sval);
-        double tval(0);
-        if ( ss >> tval){ // SUCCESS!
-            val = static_cast<T>(tval);
-        }else{
+        if (!isValidNumber(strVal)){
             std::string errMSG = _R_NUMBER_FORMAT_ERROR_MSG + strVal;
             throw errMSG;
         }
+
+        std::string sval;
+        parseValue(strVal, sval);
+        // first convert to double, then to other if needed
+        std::stringstream ss(sval);
+        double tval(0);
+        ss >> tval;
+        val = static_cast<T>(tval);
     }
 
 
+
 public:
-    Reader() = default;
+
+    Reader():_isCaseSensitive(true){}
     void readSettingsFile(const std::string &fileName);
     bool containsKey(const std::string &key) const;
     template<class T> T getValueByKey(const std::string &key) const;
     void printAll()const;
+    bool isCaseSensitive()const{return _isCaseSensitive;}
+    void setCaseSensitivity(const bool &isCS){_isCaseSensitive=isCS;}
 };
 
 //****************************************************************************************
@@ -140,6 +139,12 @@ public:
 //                      METHOD DEFINITIONS
 //
 //****************************************************************************************
+inline void Reader::toLower(std::string &s) const{
+    std::locale loc;
+    for (size_t i = 0 ; i < s.size() ; i++){
+        s[i] = std::tolower(s[i], loc);
+    }
+}
 inline void Reader::cleanLineEnds(std::string &line) const {
 /*! Removes white space from both ends of input string*/
     if ( line.size() == 0 ){ // empty line
@@ -229,6 +234,12 @@ void Reader::readSettingsFile(const std::string &fileName){
             fin.close();
             throw ReaderError(_R_BAD_VALUE_ERROR_MSG, _fileName, lineNumber, rawLine);
         }
+        // HANDLE CASE SENSITIVITY
+        if (!isCaseSensitive()){
+            toLower(key);
+            toLower(value);
+        }
+
         // DISALLOW REDEFINITION OF EXISTING KEYS
         if (containsKey(key)){
             size_t prevDefLine = this->getLineNumberByKey(key);
@@ -241,6 +252,8 @@ void Reader::readSettingsFile(const std::string &fileName){
         }
 
         // IF OK SO FAR - SAVE LINE INFO TO "DATABASE"
+
+
         lineData valueData;
         valueData._lineNumber = lineNumber;
         valueData._rawText = rawLine;
@@ -268,6 +281,8 @@ bool Reader::containsKey(const std::string &key) const{
     // validate key format
     std::string tkey(key);
     this->cleanLineEnds(tkey);
+    if(!isCaseSensitive()) toLower(tkey); // if case insensitive
+
     std::map<std::string, lineData>::const_iterator itr = _keyValues.find(tkey);
     return itr!=_keyValues.end();
 }
@@ -281,7 +296,7 @@ void Reader::printAll() const {
     }
 }
 
-void Reader::validateNumber(const std::string &strVal) const{
+bool Reader::isValidNumber(const std::string &strVal) const{
     /*!
       Tries to validate that the input string can be converted to a valid number.
       Does not currently catch many special cases. (repeated '-', '.' and 'e' characters)
@@ -289,29 +304,28 @@ void Reader::validateNumber(const std::string &strVal) const{
     // IF NUMBER USES SCIENTIFIC NOTATION, e.g.: 1e-2 , SPLIT IT BY e AND CHECK EACH SEPARATELY
     std::string num1, num2;
     if ( splitByChar(strVal,num1, num2, 'e' ) ){ // IF 'scientific' notation fractional: 2e-5
-        validateNumber(num1); // validate part before 'e'
-        validateNumber(num2); // validate part after 'e'
+
+        return isValidNumber(num1) && isValidNumber(num2); // both parts must be valid
     }else{
-        bool error = false; // set this to true if cannot parse to valid number
+
         // if contains non-numeric chars
         if (strVal.find_first_not_of(_R_DIGIT_CHARS) < std::string::npos){
-            error = true;
+            return false;
         }
         else
         // if contains multiple dots or minuses
         if (( std::count(strVal.begin(), strVal.end() ,'.') > 1) ||
             (std::count(strVal.begin(), strVal.end(), '-') > 1) ){
-            error = true;
+            return false;
         }
         // if minus sign found, but not in first position
         size_t minPos = strVal.find_first_of('-');
         if ( (minPos >0) && (minPos < std::string::npos) ){
-            error = true;
+            return false;
         }
-        if (error){ // could not parse
-            std::string errMSG = _R_NUMBER_FORMAT_ERROR_MSG + strVal;
-            throw errMSG;
-        }
+
+        // found no errors
+        return true;
     }
 }
 
@@ -323,7 +337,7 @@ void Reader::parseValue(const std::string &strVal, std::string &val) const{
 */
     val = strVal;
     // Remove white space at start and end ov current value
-    this->cleanLineEnds(val);
+    cleanLineEnds(val);
     // check that no whitespace is present
     size_t ind = val.find_first_of(_R_WHITE_SPACE);
     if (ind < std::string::npos){
@@ -374,8 +388,13 @@ T Reader::getValueByKey(const std::string &key) const
     /*!
      * Returns value corresponding to specified key.
      */
+    // create temporary working key-string
+    std::string tkey(key);
+    cleanLineEnds(tkey);
+    if(!isCaseSensitive()) toLower(tkey);
+
     // First make sure key exists
-    auto const &itr = _keyValues.find(key);
+    auto const &itr = _keyValues.find(tkey);
     if (itr==_keyValues.end()){
         throw ReaderError(_R_KEY_NOT_FOUND_ERROR_MSG+key, _fileName);
     }
@@ -389,7 +408,7 @@ T Reader::getValueByKey(const std::string &key) const
         parseValue(strVal, retVal);
         return retVal;
     }catch (std::string msg){ // error converting to required type
-        lineData badLine = (_keyValues.find(key)->second);
+        lineData badLine = (_keyValues.find(tkey)->second);
         throw ReaderError(msg, _fileName, badLine._lineNumber, badLine._rawText);
     }
 }
@@ -397,7 +416,9 @@ inline void Reader::parseValue(const std::string &strVal, size_t &val) const{
     /*!
      * Parses to size_t type (may be 64 bit). Checks that value is positive.
      */
-    validateNumber(strVal);
+    if (! isValidNumber(strVal) ){
+        throw _R_NUMBER_FORMAT_ERROR_MSG;
+    }
     double dval(0);
     parseValue(strVal, dval);
     if (dval >= 0 ){
