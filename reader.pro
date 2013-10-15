@@ -10,6 +10,7 @@ HEADERS += \
     reader.h
 
 OTHER_FILES += \
-    test.txt
+    test.txt \
+    validkeys.txt
 
 QMAKE_CXXFLAGS += -std=c++11

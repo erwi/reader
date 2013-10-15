@@ -10,7 +10,7 @@
 #include <typeinfo>
 #include <fstream>
 #include <algorithm>
-
+#include<regex>
 struct ReaderError{
     std::string errorMessage;
     std::string fileName;
@@ -67,7 +67,8 @@ class Reader
     const char _R_VDELIM = ',';
 
     std::string _fileName; // holds current file name
-    std::map<std::string, lineData> _keyValues; // "database" of all read key/value pairs
+    std::map<std::string, lineData> _keyValues;     // "database" of all read key/value pairs
+    std::vector<std::string> _validKeys;  // optional list of valid keys. read in from a file
     // STRING FORMATTING FUNCTIONS
     void removeComments(std::string &line) const;   // removes everything in a line after comment character
     void cleanLineEnds(std::string &line) const;    // removes white space from both ends of a string
@@ -127,10 +128,12 @@ public:
 
     Reader():_isCaseSensitive(true){}
     void readSettingsFile(const std::string &fileName);
+    void readValidKeysFile(const std::string &fileName);
     bool containsKey(const std::string &key) const;
     template<class T> T getValueByKey(const std::string &key) const;
     void printAll()const;
     bool isCaseSensitive()const{return _isCaseSensitive;}
+    bool isValidKey(std::string key);
     void setCaseSensitivity(const bool &isCS){_isCaseSensitive=isCS;}
 };
 
@@ -235,10 +238,18 @@ void Reader::readSettingsFile(const std::string &fileName){
             throw ReaderError(_R_BAD_VALUE_ERROR_MSG, _fileName, lineNumber, rawLine);
         }
         // HANDLE CASE SENSITIVITY
+        std::string rawKey = key;
+        std::string rawValue = value;
         if (!isCaseSensitive()){
             toLower(key);
             toLower(value);
         }
+
+        // IF VALID KEYS HAVE BEEN DEFINED, CHECK THIS IS ONE
+        if ( (_validKeys.size()>0) && !isValidKey(key)){
+            throw ReaderError(rawKey + " is not a valid key.", _fileName, lineNumber, rawLine);
+        }
+
 
         // DISALLOW REDEFINITION OF EXISTING KEYS
         if (containsKey(key)){
@@ -263,6 +274,83 @@ void Reader::readSettingsFile(const std::string &fileName){
     }while(!fin.eof());
     fin.close();
 }
+
+void Reader::readValidKeysFile(const std::string &fileName){
+    /*! Reads a text file containing a list of all allowed keys.
+        This should be called before reading in the actual settings file*/
+
+    // Make sure this is called before reading the actual settings file
+    if (_keyValues.size()>0){
+        throw ReaderError("Valid keys file should be read first.",fileName);
+    }
+
+    std::ifstream fin(fileName.c_str());
+    if (!fin.is_open()){
+        throw ReaderError (_R_FILE_OPEN_ERROR_MESSAGE + fileName);
+    }
+    std::string line;
+    size_t lineNumber = 1;
+    // READ IN RAW TEXT LINE BY LINE
+    do{
+        std::string rawLine;
+        std::getline(fin, rawLine);
+
+        std::string line(rawLine);
+        removeComments(line);
+        cleanLineEnds(line);
+
+        if (line.empty()){ // skip rest of test for empty lines
+            lineNumber++;
+            continue;
+        }
+
+        // EXTRACT KEY AND VALUES AS STRINGS
+        std::string key;
+        std::string value;
+        if (!splitByChar(line, key, value)){
+            fin.close();
+            throw ReaderError(_R_BAD_VALUE_ERROR_MSG, fileName, lineNumber, rawLine);
+        }
+
+        // HANDLE CASE SENSITIVITY
+        if (!isCaseSensitive()){
+            toLower(key);
+            toLower(value);
+        }
+
+        // need to replace wildcard "*" with regex wildcard ".*"
+        size_t ind = 0;
+        while (ind < std::string::npos){ // loop to cover multiple wildcards in same key
+            ind = key.find("*", ind);
+            if (ind < std::string::npos){
+                key.replace(ind, 1, ".*");
+                ind+=2; // increment by 2 to avoid infinite loop over same *->.*
+            }
+        }
+
+
+        // IF OK SO FAR - SAVE LINE INFO TO "DATABASE"
+        _validKeys.push_back(key);
+        lineNumber++;
+    }while(!fin.eof());
+    fin.close();
+}
+
+bool Reader::isValidKey(std::string key){
+    /*! Checks whether key is in list of valid keys.
+        Keys may contain wildcards, marked with '*'
+*/
+
+    // compare each valid key to current key
+    for(auto &k:_validKeys){
+        std::regex rx(k);
+        if ( std::regex_match(key.begin(), key.end(),rx)){
+            return true;
+        }
+    }
+    return false; // key not found
+}
+
 size_t Reader::getLineNumberByKey(const std::string &key) const{
     /*!
      * Returns line number in file where a given key/value definition occurs.

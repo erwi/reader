@@ -10,7 +10,10 @@ int main()
     try {
         reader.setCaseSensitivity(false);
         // read sttings file
+
+        reader.readValidKeysFile("validkeys.txt");
         reader.readSettingsFile("test.txt");
+
 
         // print key/value pairs in different formats
         std::cout << "A (string) = " << reader.getValueByKey<std::string>("A") << std::endl;

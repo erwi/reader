@@ -1,0 +1,13 @@
+# This example file contains key/value definitions
+# It can optionally be read *before* reading the actual
+# settings file (e.g. test.txt), as a means of defining
+# valid(expected) keys. If this is done, and any keys
+# that don't exist in this file are encountered in the
+# settings file, an Excpetion will be thrown.
+# The format of this file is key/values, where the values
+# are treated as strings that can (TODO) be used as additional
+# optional descriptors of the corresponding keys.
+
+
+numvec = vector of numbers
+E*.Time= description        # uses wildcard character '*'
