@@ -1,12 +1,13 @@
-A simple single-header-only c++ library for reading in various settings from text files.
+A simple single-header-only c++ library for reading in key/value pairs from text files to be 
+used e.g. to easily specify settings/configuration in programs.
 
-The text file must specify key/value pairs separated by the '=' sign, e.g.:
+The text file must specifies key/value pairs separated by the '=' sign, e.g.:
 
   key1 = a_value
 
 Values can be numbers, strings, arrays of numbers or arrays of strings:
 
-  stringKey = some_word
+  stringKey = some_word	    # comments are supported!
 
   numericKey = 1e-4
 
@@ -40,6 +41,8 @@ try {
   }catch(ReaderError e){
     e.printError();
 }
+
+5. Compile with a c++11 compatible compiler
 
 Exceptions will be thrown when things don't work out. For example when trying to
 read incompaible types. The thrown exception contains in addition to a convenience
