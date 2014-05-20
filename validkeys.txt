@@ -10,4 +10,4 @@
 
 
 numvec = vector of numbers
-E*.Time= description        # uses wildcard character '*'
+E*.Time = description        # uses wildcard character '*'
