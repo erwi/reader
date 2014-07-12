@@ -6,3 +6,4 @@ Another = Some_String_Value
 E1.Time = 1.2e-3
 strVec = [aaa, 3, bBb] # a string vector
 C = 1.2.3   # a valid string, but not number
+emptyVec = [ ] # should be read as a vector of length 0

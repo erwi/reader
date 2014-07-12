@@ -57,9 +57,18 @@ int main() {
         //
         // first read assignement as string
         // then as number, causing error
+        try {
         std::cout << "\nread value as string then incorrectly as a number " << std::endl;
         std::cout << "C (string) = " << reader.getValueByKey<std::string>("C") << std::endl;
         std::cout << "C (float)  = " << reader.getValueByKey<float>("C") << std::endl;
+        } catch (ReaderError e) {
+            e.printError();
+        }
+
+        //
+        // Read empty vector, make sure its length is 0
+        std::vector<int> emptyVec = reader.getValueByKey<std::vector<int>>("emptyVec");
+        std::cout << "lenght of empty vector is " << emptyVec.size() << std::endl;
 
 
     } catch(ReaderError e) { // PRINT ALL ERRORS
